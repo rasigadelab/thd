@@ -69,7 +69,7 @@ H <- matrix(c(
   21, 18, 28, 00, 00, 00,
   23, 25, 31, 07, 00, 00,
   19, 27, 23, 09, 11, 00
-), ncol = 6, byrow = T)
+), ncol = 6, byrow = TRUE)
 
 # Make matrix symmetric
 H <- H + t(H)
