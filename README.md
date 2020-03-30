@@ -35,7 +35,7 @@ user-defined parameters:
     distances. These markers can be anything from minisatellites to
     nucleotides as long as they convey a phylogenetic signal. For
     typical whole genome-based applications, `m` is the effective genome
-    size, i.e. the pathogen's genome size minus the size of regions
+    size, i.e. the pathogen’s genome size minus the size of regions
     excluded from analysis (typically repeated or low-quality regions).
 
 -   `mu` is the *mutation* (or substitution) rate for each marker per
@@ -93,6 +93,316 @@ Visualize the results along with a dendrogram of the isolates.
 
 <img src="README_files/figure-markdown_strict/unnamed-chunk-6-1.png" style="display: block; margin: auto;" />
 
+Tuberculosis minisatellite example
+----------------------------------
+
+This tutorial illustrates computation of THD values with different
+timescales and identification of factors (metadata) associated with
+epidemic success. The tutorial also provides an introduction to model
+adjustment for population structure.
+
+Introduction
+------------
+
+The dataset is derived from [Rasigade et
+al. 2017](https://www.nature.com/articles/srep45326) (open access). We
+use a collection of 1,641 isolates of *Mycobacterium tuberculosis*
+complex from France. The genotypes are 15-loci minisatellite markers,
+technically called mycobacterial interspersed repetitive units (MIRU).
+The metadata are related to disease transmissibility, including the
+pulmonary localization of disease (`lung`) and the presence of acid-fast
+bacilly in the sputum (`afb`), associated with high transmission risk.
+
+Load the `thd` package and the example dataset .
+
+    library(thd)
+    data(tb)
+
+The dataset contains the matrix of genotypes `miru` and the metadata
+table `meta`.
+
+    attach(tb)
+    class(miru); dim(miru)
+
+    ## [1] "matrix"
+
+    ## [1] 1641   15
+
+    class(meta); dim(meta); names(meta)
+
+    ## [1] "data.frame"
+
+    ## [1] 1641    2
+
+    ## [1] "afb"  "lung"
+
+The next computations require a matrix of genetic distances. The package
+provides the convenience function `hamming` to compute this matrix.
+(Note that this function is written in R to avoid compilation and thus
+is not very fast; consider using specialized packages such as `ape` for
+larger datasets (&gt; 10,000 individuals)).
+
+    H <- hamming(miru)
+
+Computing THD with short- and long-term timescales
+--------------------------------------------------
+
+The THD timescale allows to focus the analysis on recent epidemic
+success (with a short timescale) or long-term success. Long-term success
+is more likely to reflect features of the pathogen rather than the host,
+because longer time scales (i.e. orders of magnitude above the usual
+infectivity period) consider success across numerous hosts, which is
+expected to average out the host’s influence. (An obvious exception is
+pathogen-host coevolution, however it is not expected to weigh much in
+tuberculosis-human interactions over moderately short timescales)
+
+The 3 parameters of a THD analysis are the timescale, the no. of markers
+`m` and the substitution rate per marker `mu`. We use two timescales, a
+short-term timescale of 20y and a long-term timescale of 200y.
+Parameters `m` and `mu` are adapted to the minisatellites used for
+genotyping.
+
+    tshort <- 20
+    tlong <- 200
+    m <- 15
+    mu <- 5e-4
+
+Compute the THD values with short and long timescales using the `thd`
+function and examine their distribution.
+
+    thd.short <- thd(H, tshort, m, mu)
+    thd.long  <- thd(H, tlong, m, mu)
+    par(mfrow = c(1, 2))
+    hist(thd.short, xlab = "Short-term THD", main = "")
+    hist(thd.long, xlab = "Long-term THD", main = "")
+
+![](README_files/figure-markdown_strict/unnamed-chunk-11-1.png)
+
+The distribution of short-term THDs is highly skewed. Most individuals
+have values near zero, denoting sporadic cases, while higher values
+denote isolates in recent clusters. Before we move on to the linear
+modelling step, it can be helpful to apply a transformation to reduce
+skewness. A simple but effective transformation is to obtain Z-scores
+after taking logs (log-Z transform). (This transformation is not
+strictly necessary for the weakly-skewed long-term THD but we apply
+anyway for consistency with short-term THD)
+
+    thd.short.lz <- scale(log(thd.short))
+    thd.long.lz <- scale(log(thd.long))
+
+Linear modelling of THD to characterize drivers of epidemic success
+-------------------------------------------------------------------
+
+We compare THDs depending on two suspected drivers of success, sputum
+smear positivity and pulmonary localization. The working hypotheses that
+we examine in this section to illustrate THD modelling are as follows:
+
+-   sputum smear positivity drives short-term success independent of TB
+    population structure, because this feature depends more on patient
+    status (delayed treatment, immune impairments, etc) than pathogen
+    features;
+
+-   pulmonary infection also drives success (as extrapulmonary disease
+    is less transmissible) but depends more on the population structure
+    because various TB lineages exhibit differences in their ability to
+    cause active pulmonary disease.
+
+Examine the distribution of THDs depending on the timescale, sputum
+smear positivity and pulmonary infection.
+
+    bp <- function(f, xlab, ylab) {
+      boxplot(f, meta, ylim = c(-3,3), xlab = xlab, ylab = ylab)
+    }
+    par(mfrow = c(2,2))
+    bp(thd.short.lz ~ afb, "AFB smear positivity", "Short-term THD")
+    bp(thd.short.lz ~ lung, "Pulmonary infection", "Short-term THD")
+    bp(thd.long.lz ~ afb, "AFB smear positivity", "Long-term THD")
+    bp(thd.long.lz ~ lung, "Pulmonary infection", "Long-term THD")
+
+![](README_files/figure-markdown_strict/unnamed-chunk-13-1.png)
+
+Visual inspection suggests that, as expected, both pulmonary disease and
+sputum smear positivity correlate with success. The amplitudes of
+difference are weak, with the smallest difference found for smear
+positivity and a long-term THD. This observation supports the working
+hypotheses because if smear positivity depends more on the host than on
+the pathogen, then its association with long-term THD should be weak
+because the effect of the host is diluted over long time frames.
+
+We can now use linear models to examine the strength of associations and
+their dependency on population structure. Recall that by design, THD is
+highly dependent on population structure because it directly reflects
+this structure, so it is desirable to adjust for this effect.
+
+### Adjusting for population structure
+
+The `thd` package provides the `thd.adjust` method to adjust for
+population structure. This function computes a set of principal
+coordinates (PCs) significantly associated with the provided THD values.
+Including these PCs as covariates of a linear model provides a means to
+control for population structure using the same data that were used to
+compute THD.
+
+(More sophisticated methods exist to adjust for population structure,
+including mixed-effect models. The `thd.adjust` method, in line with the
+philosophy of the `thd` approach, puts emphasis on simplicity. See
+[Price et al. Nat Genet
+2006](http://biostat.jhsph.edu/~iruczins/teaching/misc/2008.140.668/papers/price2006.pdf)
+for details on PC-based correction, and [Hoffman. PLoS One
+2013](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0075707)
+for alternatives.)
+
+Compute the PC adjustment sets for short- and long-term THDs.
+
+    adj.short <- thd.adjust(thd.short.lz, H, m)
+    adj.long <- thd.adjust(thd.long.lz, H, m)
+    ncol(adj.short); ncol(adj.long)
+
+    ## [1] 8
+
+    ## [1] 12
+
+Eight and 12 PCs were retained for short and long timescales,
+respectively. These adjustement sets will help determine whether
+associations with THD are structure-dependent:
+
+-   An association is structure-dependent if its significance decreases
+    after inclusion of the adjustment set in the model. Structure
+    dependency indicates that the predictor is tied to the population
+    structure; in the case of a pathogen such as TB, this suggests that
+    the predictor depends on the pathogen itself and evolves with the
+    pathogen with little evolutionary convergence.
+
+-   A structure-independent association retains its significance after
+    correction for population structure. This suggests either that the
+    predictor depends on the host rather than on the pathogen or that
+    the predictor is a pathogen feature that evolves independent of the
+    pathogen structure - this latter case strongly suggest evolutionary
+    convergence of the feature, which supports a causal effect.
+
+### AFB smear sputum positivity drives success independent of population structure
+
+We use analysis of variance on linear models to examine structure
+dependency of the association of smear positivity and short-term THD.
+
+    anova(lm(thd.short.lz ~ afb, meta))
+
+    ## Analysis of Variance Table
+    ## 
+    ## Response: thd.short.lz
+    ##            Df Sum Sq Mean Sq F value    Pr(>F)    
+    ## afb         1  18.51 18.5051  18.419 2.044e-05 ***
+    ## Residuals 646 649.02  1.0047                      
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+    anova(lm(thd.short.lz ~ adj.short + afb, meta))
+
+    ## Analysis of Variance Table
+    ## 
+    ## Response: thd.short.lz
+    ##            Df Sum Sq Mean Sq F value    Pr(>F)    
+    ## adj.short   8  88.38 11.0471  12.613 < 2.2e-16 ***
+    ## afb         1  20.35 20.3467  23.231 1.798e-06 ***
+    ## Residuals 638 558.80  0.8759                      
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+The significance of the `afb` predictor was retained (even reinforced by
+a factor ~10) after controlling for population structure. This supports
+the hypothesis that `afb` depends on the host rather than the pathogen
+(the alternative explanation, namely that a pathogen feature under
+convergent evolution enhances smear positivity, is much less likely
+given current knowledge on TB).
+
+### Pulmonary infection is a pathogen feature that depends on population structure
+
+Using the same approach with the `lung` predictor yields the following
+models.
+
+    anova(lm(thd.long.lz ~ lung, meta))
+
+    ## Analysis of Variance Table
+    ## 
+    ## Response: thd.long.lz
+    ##            Df Sum Sq Mean Sq F value Pr(>F)   
+    ## lung        1  10.67 10.6667  10.556 0.0012 **
+    ## Residuals 919 928.66  1.0105                  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+    anova(lm(thd.long.lz ~ adj.long + lung, meta))
+
+    ## Analysis of Variance Table
+    ## 
+    ## Response: thd.long.lz
+    ##            Df Sum Sq Mean Sq  F value  Pr(>F)    
+    ## adj.long   12 823.30  68.609 538.7608 < 2e-16 ***
+    ## lung        1   0.52   0.523   4.1091 0.04295 *  
+    ## Residuals 907 115.50   0.127                     
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+The significance of the `lung` predictor decreases strongly (by a factor
+~40) after controlling for population structure. This supports the
+hypothesis that an active pulmonary infection mostly depends on the
+pathogen itself, as supported by varying rates of active pulmonary
+diseases in different TB lineages.
+
+We can verify this point by modelling `lung` as a function of population
+structure using logistic regression.
+
+    anova(glm(lung ~ adj.long, meta, family = binomial), test = "Chisq")
+
+    ## Analysis of Deviance Table
+    ## 
+    ## Model: binomial, link: logit
+    ## 
+    ## Response: lung
+    ## 
+    ## Terms added sequentially (first to last)
+    ## 
+    ## 
+    ##          Df Deviance Resid. Df Resid. Dev  Pr(>Chi)    
+    ## NULL                       920     1105.4              
+    ## adj.long 12   55.637       908     1049.8 1.391e-07 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+This model confirms a strong dependency of pulmonary infection and
+population structure. Performing the same analysis for sputum smear
+positivity and the appropriate adjustment set confirms that `afb`,
+contrary to pulmonary infection, is not explained by population
+structure:
+
+    anova(glm(afb ~ adj.short, meta, family = binomial), test = "Chisq")
+
+    ## Analysis of Deviance Table
+    ## 
+    ## Model: binomial, link: logit
+    ## 
+    ## Response: afb
+    ## 
+    ## Terms added sequentially (first to last)
+    ## 
+    ## 
+    ##           Df Deviance Resid. Df Resid. Dev Pr(>Chi)
+    ## NULL                        647     890.30         
+    ## adj.short  8   5.9778       639     884.32   0.6497
+
+Conclusions
+-----------
+
+In this tutorial, we have seen how to use different timescales to
+examine hypotheses pertaining to different epidemic dynamics (here, AFB
+positivity of sputum smear as a host-dependent feature influencing
+short-term success; and a pulmonary disease as a pathogen-dependent
+feature influencing long-term success).
+
+The tutorial illustrates how to use THD values (after transformation if
+required) in linear models, and the use of the `thd.adjust` method to
+examine dependendy on population structure.
+
 References
 ----------
 
@@ -100,7 +410,7 @@ Rasigade JP, Barbier M, Dumitrescu O, Pichat C, Carret G, Ronnaux-Baron
 AS, Blasquez G, Godin-Benhaim C, Boisset S, Carricajo A, Jacomo V,
 Fredenucci I, Pérouse de Montclos M, Flandrois JP, Ader F, Supply P,
 Lina G, Wirth T. Strain-specific estimation of epidemic success provides
-insights into the transmission dynamics of tuberculosis. Sci Rep. 2017
+insights into the transmission dynamics of tuberculosis. Sci Rep. 2017
 Mar 28;7:45326. doi: 10.1038/srep45326. PMID: 28349973
 
 Barbier M, Dumitrescu O, Pichat C, Carret G, Ronnaux-Baron AS, Blasquez
@@ -108,7 +418,7 @@ G, Godin-Benhaim C, Boisset S, Carricajo A, Jacomo V, Fredenucci I,
 Pérouse de Montclos M, Genestet C, Flandrois JP, Ader F, Supply P, Lina
 G, Wirth T, Rasigade JP. Changing patterns of human migrations shaped
 the global population structure of Mycobacterium tuberculosis in France.
-Sci Rep. 2018 Apr 11;8(1):5855. doi: 10.1038/s41598-018-24034-6. PMID:
+Sci Rep. 2018 Apr 11;8(1):5855. doi: 10.1038/s41598-018-24034-6. PMID:
 29643428
 
 Thierry Wirth, Marine Bergot, Jean-Philippe Rasigade, Bruno Pichon,

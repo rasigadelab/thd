@@ -1,5 +1,6 @@
 #' @name thdfun
 #' @title Timescaled haplotypic density
+#' @importFrom stats cmdscale coef lm optimise p.adjust
 #' @param H matrix of genetic (Hamming) distances between individuals. Must be symmetric.
 #' @param t timescale, reflecting the approximate length of time before present considered for density estimation
 #' @param m number of markers (e.g. nucleotides) used in genetic distance computation

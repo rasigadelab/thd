@@ -2,6 +2,7 @@ Package: thd
 Type: Package
 Title: Timescaled haplotypic density
 Version: 1.0.1
+Depends: R (>= 2.10)
 Author: Jean-Philippe Rasigade
 Maintainer: Jean-Philippe Rasigade <jean-philippe.rasigade@univ-lyon1.fr>
 Description: Comparative analysis of the evolutionary success of individuals in a population based on genetic distances.
