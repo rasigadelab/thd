@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 THD is an R package for estimating and comparing the evolutionary success of individuals in a population based on genetic distances.
 
-The primary application of THD is the quantitative analysis and identification of factors that influence the epidemic success of pathogens. The approach assigns a index of epidemic success to each individual in a population. This index is then typically used as the response variable in multivariate models including potential predictors of success. See the publication list below for practical applications.
+The primary application of THD is the quantitative analysis and identification of factors that influence the epidemic success of pathogens. The approach assigns a index of epidemic success to each individual in a population. This index is then typically used as the response variable in multivariate models including potential predictors of success. See the publication list below for applications.
 
 ## Installation
 
@@ -32,7 +32,7 @@ THD analysis requires a matrix of genetic distances and three user-defined param
 
 * `m` is the number of *markers* used for computing the genetic distances. These markers can be anything from minisatellites to nucleotides as long as they convey a phylogenetic signal. For typical whole genome-based applications, `m` is the effective genome size, i.e. the pathogen's genome size minus the size of regions excluded from analysis (typically repeated or low-quality regions).
 
-* `mu` is the *mutation* (or substitution) rate for each marker per unit of time. This unit of time must be the same as the one used in `t`.
+* `mu` is the *mutation* (or substitution) rate for each marker per unit of time. This unit of time in `mu` must be the same as the one used in `t`.
 
 ## Toy example
 
@@ -59,7 +59,7 @@ H <- H + t(H)
 colnames(H) <- LETTERS[1:ncol(H)]
 ```
 
-Choose parameters. Suppose we used 64 markers, each with a substitution rate of 0.001 per marker per year, and we are interested in a timescale of 10 years.
+Select parameters. Suppose we used 64 markers, each with a substitution rate of 0.001 per marker per year, and we are interested in a timescale of 10 years.
 
 ```{r}
 m <- 64
@@ -86,7 +86,7 @@ barplot(x[hc$order], ylim = c(0.5, 0), ylab = "THD")
 
 ## Tuberculosis minisatellite example
 
-This tutorial illustrates computation of THD values with different timescales and identification of
+This (more involved) example illustrates computation of THD values with different timescales and identification of
 factors (metadata) associated with epidemic success. The tutorial also provides an introduction to model adjustment for
 population structure.
 
@@ -96,7 +96,7 @@ The dataset is derived from [Rasigade et al. 2017](https://www.nature.com/articl
 We use a collection of 1,641 isolates of *Mycobacterium tuberculosis* complex from France.
 The genotypes are 15-loci minisatellite markers, technically called mycobacterial interspersed repetitive units (MIRU).
 The metadata are related to disease transmissibility, including the pulmonary localization of disease (`lung`) and
-the presence of acid-fast bacilly in the sputum (`afb`), associated with high transmission risk.
+the presence of acid-fast bacilli in the sputum (`afb`), associated with high transmission risk.
 
 Load the `thd` package and the example dataset \code{tb}. 
 
@@ -159,12 +159,14 @@ thd.long.lz <- scale(log(thd.long))
 ## Linear modelling of THD to characterize drivers of epidemic success
 
 We compare THDs depending on two suspected drivers of success, sputum smear positivity and pulmonary localization.
-The working hypotheses that we examine in this section to illustrate THD modelling are as follows:
+We examine two working hypothese to illustrate THD modelling:
 
-* sputum smear positivity drives short-term success independent of TB population structure, because this
-feature depends more on patient status (delayed treatment, immune impairments, etc) than pathogen features;
+* sputum smear positivity (`afb`) drives short-term success independent of TB population structure, because this
+feature depends more on patient status (delayed treatment, immune impairment, etc) than pathogen features;
 
-* pulmonary infection also drives success (as extrapulmonary disease is less transmissible) but depends more on the population structure because various TB lineages exhibit differences in their ability to cause active pulmonary disease.
+* pulmonary infection (`lung`) also drives success because extrapulmonary disease is less transmissible, but this feature depends more on the population structure because various TB lineages exhibit differences in their ability to cause active pulmonary disease.
+
+Under these hypotheses, the association of `afb` with THD should be stronger using the shorter 20y timescale compared with the longer 200y timescale. This association should not be solely explained by population structure if it is host-related. Conversely, the association of `lung` with THD, which is expected to be pathogen-dependent and vertically inherited, should be stronger using the 200y timescale and should also depend on population structure.
 
 Examine the distribution of THDs depending on the timescale, sputum smear positivity and pulmonary infection.
 
@@ -182,11 +184,11 @@ bp(thd.long.lz ~ lung, "Pulmonary infection", "Long-term THD")
 Visual inspection suggests that, as expected, both pulmonary disease and sputum smear positivity correlate with success.
 The amplitudes of difference are weak, with the smallest difference found for smear positivity and a long-term THD.
 This observation supports the working hypotheses because if smear positivity depends more on the host than on the pathogen, then its association
-with long-term THD should be weak because the effect of the host is diluted over long time frames.
+with long-term THD should be weak when the influence of the host is diluted over long time frames.
 
-We can now use linear models to examine the strength of associations and their dependency on population structure.
+We will now use linear modelling to examine the strength of associations and their dependency on population structure.
 Recall that by design, THD is highly dependent on population structure because it directly reflects this structure, so it is desirable
-to adjust for this effect.
+to control for this effect.
 
 ### Adjusting for population structure
 
@@ -194,9 +196,9 @@ The `thd` package provides the `thd.adjust` method to adjust for population stru
 This function computes a set of principal coordinates (PCs) significantly associated with the provided THD values.
 Including these PCs as covariates of a linear model provides a means to control for population structure using the same data that were used to compute THD.
 
-(More sophisticated methods exist to adjust for population structure, including mixed-effect models. The `thd.adjust` method, in line with
-the philosophy of the `thd` approach, puts emphasis on simplicity. See [Price et al. Nat Genet 2006](http://biostat.jhsph.edu/~iruczins/teaching/misc/2008.140.668/papers/price2006.pdf) for
-details on PC-based correction, and [Hoffman. PLoS One 2013](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0075707) for alternatives.)
+(More sophisticated methods exist to adjust for population structure, including phylogenetic generalized least squares and mixed-effect models. The `thd.adjust` method, in line with
+the philosophy of the `thd` approach, puts emphasis on simplicity; it does not require phylogenetic reconstruction nor additional packages. See [Price et al. Nat Genet 2006](http://biostat.jhsph.edu/~iruczins/teaching/misc/2008.140.668/papers/price2006.pdf) and [Li & Yu. Genet Epidemiol 2008](https://onlinelibrary.wiley.com/doi/abs/10.1002/gepi.20296) for
+details on PC-based correction, and [Revell. Meth Ecol Evol 2010](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2010.00044.x) and [Hoffman. PLoS One 2013](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0075707) for alternatives.)
 
 Compute the PC adjustment sets for short- and long-term THDs.
 
@@ -210,12 +212,12 @@ Eight and 12 PCs were retained for short and long timescales, respectively.
 These adjustement sets will help determine whether associations with THD are structure-dependent:
 
 * An association is structure-dependent if its significance decreases after inclusion of the adjustment set in the model.
-Structure dependency indicates that the predictor is tied to the population structure; in the case of a pathogen such as TB, this suggests
+Structure dependency indicates that the association is explained by the population structure; in the case of a pathogen such as TB, this suggests
 that the predictor depends on the pathogen itself and evolves with the pathogen with little evolutionary convergence.
 
 * A structure-independent association retains its significance after correction for population structure. This suggests either that
 the predictor depends on the host rather than on the pathogen or that the predictor is a pathogen feature that evolves independent of
-the pathogen structure - this latter case strongly suggest evolutionary convergence of the feature, which supports a causal effect.
+the pathogen structure - this latter case may indicate evolutionary convergence of the feature, which supports a causal effect.
 
 ### AFB smear sputum positivity drives success independent of population structure
 
@@ -230,7 +232,7 @@ The significance of the `afb` predictor was retained (even reinforced by a facto
 This supports the hypothesis that `afb` depends on the host rather than the pathogen (the alternative explanation, namely
 that a pathogen feature under convergent evolution enhances smear positivity, is much less likely given current knowledge on TB).
 
-### Pulmonary infection is a pathogen feature that depends on population structure
+### Pulmonary infection depends on population structure
 
 Using the same approach with the `lung` predictor yields the following models.
 

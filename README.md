@@ -9,7 +9,7 @@ identification of factors that influence the epidemic success of
 pathogens. The approach assigns a index of epidemic success to each
 individual in a population. This index is then typically used as the
 response variable in multivariate models including potential predictors
-of success. See the publication list below for practical applications.
+of success. See the publication list below for applications.
 
 Installation
 ------------
@@ -35,12 +35,12 @@ user-defined parameters:
     distances. These markers can be anything from minisatellites to
     nucleotides as long as they convey a phylogenetic signal. For
     typical whole genome-based applications, `m` is the effective genome
-    size, i.e. the pathogen’s genome size minus the size of regions
+    size, i.e. the pathogen's genome size minus the size of regions
     excluded from analysis (typically repeated or low-quality regions).
 
 -   `mu` is the *mutation* (or substitution) rate for each marker per
-    unit of time. This unit of time must be the same as the one used in
-    `t`.
+    unit of time. This unit of time in `mu` must be the same as the one
+    used in `t`.
 
 Toy example
 -----------
@@ -68,7 +68,7 @@ track of column names in its output).
     H <- H + t(H)
     colnames(H) <- LETTERS[1:ncol(H)]
 
-Choose parameters. Suppose we used 64 markers, each with a substitution
+Select parameters. Suppose we used 64 markers, each with a substitution
 rate of 0.001 per marker per year, and we are interested in a timescale
 of 10 years.
 
@@ -96,22 +96,22 @@ Visualize the results along with a dendrogram of the isolates.
 Tuberculosis minisatellite example
 ----------------------------------
 
-This tutorial illustrates computation of THD values with different
-timescales and identification of factors (metadata) associated with
-epidemic success. The tutorial also provides an introduction to model
-adjustment for population structure.
+This (more involved) example illustrates computation of THD values with
+different timescales and identification of factors (metadata) associated
+with epidemic success. The tutorial also provides an introduction to
+model adjustment for population structure.
 
 Introduction
 ------------
 
-The dataset is derived from [Rasigade et
-al. 2017](https://www.nature.com/articles/srep45326) (open access). We
-use a collection of 1,641 isolates of *Mycobacterium tuberculosis*
-complex from France. The genotypes are 15-loci minisatellite markers,
+The dataset is derived from [Rasigade et al.
+2017](https://www.nature.com/articles/srep45326) (open access). We use a
+collection of 1,641 isolates of *Mycobacterium tuberculosis* complex
+from France. The genotypes are 15-loci minisatellite markers,
 technically called mycobacterial interspersed repetitive units (MIRU).
 The metadata are related to disease transmissibility, including the
 pulmonary localization of disease (`lung`) and the presence of acid-fast
-bacilly in the sputum (`afb`), associated with high transmission risk.
+bacilli in the sputum (`afb`), associated with high transmission risk.
 
 Load the `thd` package and the example dataset .
 
@@ -150,9 +150,9 @@ Computing THD with short- and long-term timescales
 The THD timescale allows to focus the analysis on recent epidemic
 success (with a short timescale) or long-term success. Long-term success
 is more likely to reflect features of the pathogen rather than the host,
-because longer time scales (i.e. orders of magnitude above the usual
+because longer time scales (i.e. orders of magnitude above the usual
 infectivity period) consider success across numerous hosts, which is
-expected to average out the host’s influence. (An obvious exception is
+expected to average out the host's influence. (An obvious exception is
 pathogen-host coevolution, however it is not expected to weigh much in
 tuberculosis-human interactions over moderately short timescales)
 
@@ -194,18 +194,27 @@ Linear modelling of THD to characterize drivers of epidemic success
 -------------------------------------------------------------------
 
 We compare THDs depending on two suspected drivers of success, sputum
-smear positivity and pulmonary localization. The working hypotheses that
-we examine in this section to illustrate THD modelling are as follows:
+smear positivity and pulmonary localization. We examine two working
+hypothese to illustrate THD modelling:
 
--   sputum smear positivity drives short-term success independent of TB
-    population structure, because this feature depends more on patient
-    status (delayed treatment, immune impairments, etc) than pathogen
-    features;
+-   sputum smear positivity (`afb`) drives short-term success
+    independent of TB population structure, because this feature depends
+    more on patient status (delayed treatment, immune impairment, etc)
+    than pathogen features;
 
--   pulmonary infection also drives success (as extrapulmonary disease
-    is less transmissible) but depends more on the population structure
-    because various TB lineages exhibit differences in their ability to
-    cause active pulmonary disease.
+-   pulmonary infection (`lung`) also drives success because
+    extrapulmonary disease is less transmissible, but this feature
+    depends more on the population structure because various TB lineages
+    exhibit differences in their ability to cause active pulmonary
+    disease.
+
+Under these hypotheses, the association of `afb` with THD should be
+stronger using the shorter 20y timescale compared with the longer 200y
+timescale. This association should not be solely explained by population
+structure if it is host-related. Conversely, the association of `lung`
+with THD, which is expected to be pathogen-dependent and vertically
+inherited, should be stronger using the 200y timescale and should also
+depend on population structure.
 
 Examine the distribution of THDs depending on the timescale, sputum
 smear positivity and pulmonary infection.
@@ -227,12 +236,12 @@ difference are weak, with the smallest difference found for smear
 positivity and a long-term THD. This observation supports the working
 hypotheses because if smear positivity depends more on the host than on
 the pathogen, then its association with long-term THD should be weak
-because the effect of the host is diluted over long time frames.
+when the influence of the host is diluted over long time frames.
 
-We can now use linear models to examine the strength of associations and
-their dependency on population structure. Recall that by design, THD is
-highly dependent on population structure because it directly reflects
-this structure, so it is desirable to adjust for this effect.
+We will now use linear modelling to examine the strength of associations
+and their dependency on population structure. Recall that by design, THD
+is highly dependent on population structure because it directly reflects
+this structure, so it is desirable to control for this effect.
 
 ### Adjusting for population structure
 
@@ -244,11 +253,17 @@ control for population structure using the same data that were used to
 compute THD.
 
 (More sophisticated methods exist to adjust for population structure,
-including mixed-effect models. The `thd.adjust` method, in line with the
-philosophy of the `thd` approach, puts emphasis on simplicity. See
-[Price et al. Nat Genet
+including phylogenetic generalized least squares and mixed-effect
+models. The `thd.adjust` method, in line with the philosophy of the
+`thd` approach, puts emphasis on simplicity; it does not require
+phylogenetic reconstruction nor additional packages. See [Price et al.
+Nat Genet
 2006](http://biostat.jhsph.edu/~iruczins/teaching/misc/2008.140.668/papers/price2006.pdf)
-for details on PC-based correction, and [Hoffman. PLoS One
+and [Li & Yu. Genet Epidemiol
+2008](https://onlinelibrary.wiley.com/doi/abs/10.1002/gepi.20296) for
+details on PC-based correction, and [Revell. Meth Ecol Evol
+2010](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2010.00044.x)
+and [Hoffman. PLoS One
 2013](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0075707)
 for alternatives.)
 
@@ -268,16 +283,16 @@ associations with THD are structure-dependent:
 
 -   An association is structure-dependent if its significance decreases
     after inclusion of the adjustment set in the model. Structure
-    dependency indicates that the predictor is tied to the population
-    structure; in the case of a pathogen such as TB, this suggests that
-    the predictor depends on the pathogen itself and evolves with the
-    pathogen with little evolutionary convergence.
+    dependency indicates that the association is explained by the
+    population structure; in the case of a pathogen such as TB, this
+    suggests that the predictor depends on the pathogen itself and
+    evolves with the pathogen with little evolutionary convergence.
 
 -   A structure-independent association retains its significance after
     correction for population structure. This suggests either that the
     predictor depends on the host rather than on the pathogen or that
     the predictor is a pathogen feature that evolves independent of the
-    pathogen structure - this latter case strongly suggest evolutionary
+    pathogen structure - this latter case may indicate evolutionary
     convergence of the feature, which supports a causal effect.
 
 ### AFB smear sputum positivity drives success independent of population structure
@@ -315,7 +330,7 @@ the hypothesis that `afb` depends on the host rather than the pathogen
 convergent evolution enhances smear positivity, is much less likely
 given current knowledge on TB).
 
-### Pulmonary infection is a pathogen feature that depends on population structure
+### Pulmonary infection depends on population structure
 
 Using the same approach with the `lung` predictor yields the following
 models.
@@ -410,7 +425,7 @@ Rasigade JP, Barbier M, Dumitrescu O, Pichat C, Carret G, Ronnaux-Baron
 AS, Blasquez G, Godin-Benhaim C, Boisset S, Carricajo A, Jacomo V,
 Fredenucci I, Pérouse de Montclos M, Flandrois JP, Ader F, Supply P,
 Lina G, Wirth T. Strain-specific estimation of epidemic success provides
-insights into the transmission dynamics of tuberculosis. Sci Rep. 2017
+insights into the transmission dynamics of tuberculosis. Sci Rep. 2017
 Mar 28;7:45326. doi: 10.1038/srep45326. PMID: 28349973
 
 Barbier M, Dumitrescu O, Pichat C, Carret G, Ronnaux-Baron AS, Blasquez
@@ -418,7 +433,7 @@ G, Godin-Benhaim C, Boisset S, Carricajo A, Jacomo V, Fredenucci I,
 Pérouse de Montclos M, Genestet C, Flandrois JP, Ader F, Supply P, Lina
 G, Wirth T, Rasigade JP. Changing patterns of human migrations shaped
 the global population structure of Mycobacterium tuberculosis in France.
-Sci Rep. 2018 Apr 11;8(1):5855. doi: 10.1038/s41598-018-24034-6. PMID:
+Sci Rep. 2018 Apr 11;8(1):5855. doi: 10.1038/s41598-018-24034-6. PMID:
 29643428
 
 Thierry Wirth, Marine Bergot, Jean-Philippe Rasigade, Bruno Pichon,
